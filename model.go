@@ -8,9 +8,10 @@ type TemporalModel interface {
 }
 
 type TIDer interface {
-	GetTID() interface{}
+	GetTID() string
+	SetTID(string)
 }
 
 type IDer interface {
-	GetID() interface{}
+	GetID() uint64
 }

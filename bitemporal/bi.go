@@ -8,8 +8,8 @@ import (
 
 // Model is the temporal model with 2-axes of time
 type Model struct {
-	ID        interface{}
-	TID       interface{}
+	ID        uint64
+	TID       string `gorm:"column:tid"`
 	SysFrom   time.Time
 	SysTo     null.Time
 	ValidFrom time.Time
@@ -18,5 +18,5 @@ type Model struct {
 
 // Clean the information related with history
 func (t *Model) Clean() {
-	t.ID = nil
+	t.ID = 0
 }

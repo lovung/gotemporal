@@ -8,14 +8,26 @@ import (
 	"gorm.io/gorm"
 )
 
-var _ gotemporal.Temporaler = (*BiGormer)(nil)
+var _ gotemporal.Temporal = (*BiGormer)(nil)
 
 type BiGormer struct {
-	db gorm.DB
+	db        *gorm.DB
+	tableName string
 }
 
-func (g *BiGormer) Create(model interface{}) error {
-	return g.db.Create(model).Error
+func NewManager(
+	db *gorm.DB,
+	tableName string,
+) *BiGormer {
+	return &BiGormer{
+		db:        db,
+		tableName: tableName,
+	}
+}
+
+func (g *BiGormer) Create(model gotemporal.TIDer) error {
+	model.SetTID(gotemporal.GenTID())
+	return g.db.Table(g.tableName).Create(model).Error
 }
 
 func (g *BiGormer) UpdateObject(model interface{}) error {
@@ -27,7 +39,7 @@ func (g *BiGormer) UpdateRecord(model interface{}) error {
 }
 
 func (g *BiGormer) GetRecord(model gotemporal.TemporalModel, systemAt time.Time, validAt time.Time) error {
-	return g.db.Scopes(
+	return g.db.Table(g.tableName).Scopes(
 		gotemporal.WithTID(model),
 		gotemporal.WithSysAt(systemAt),
 		gotemporal.WithValidAt(validAt),
@@ -35,23 +47,25 @@ func (g *BiGormer) GetRecord(model gotemporal.TemporalModel, systemAt time.Time,
 }
 
 func (g *BiGormer) ListRecords(model gotemporal.TemporalModel, at time.Time, to interface{}) error {
-	return g.db.Scopes(
+	return g.db.Table(g.tableName).Scopes(
 		gotemporal.WithTID(model),
 		gotemporal.WithSysAt(at),
 	).Find(to).Error
 }
 
-func (g *BiGormer) DeleteObject(tid gotemporal.TIDer) error {
-	return g.db.Delete("tid = ?", tid.GetTID()).Error
+func (g *BiGormer) DeleteObject(object gotemporal.TIDer) error {
+	return g.db.Table(g.tableName).Where("tid = ?", object.GetTID()).Update("sys_to", time.Now()).Error
 }
 
 func (g *BiGormer) HardDeleteObject(tid gotemporal.TIDer) error {
-	return g.db.Unscoped().Delete("tid = ?", tid.GetTID()).Error
+	return g.db.Table(g.tableName).Where("tid = ?", tid.GetTID()).Delete(tid).Error
 }
 
 func (g *BiGormer) DeleteRecordWithoutCollection(record gotemporal.TemporalModel, modifyTime null.Time) error {
-	// TODO: Update here follow bitemporal
-	return g.db.Delete("id = ?", record.GetID()).Error
+	// TODO:
+	// Find the previous/next record to update the valid_from and valid_to
+	// Set the sys_to for target record
+	return g.db.Table(g.tableName).Where("id = ?", record.GetID()).Update("sys_to", time.Now()).Error
 }
 
 func (g *BiGormer) DeleteRecord(record gotemporal.TemporalModel, modifyTime null.Time) error {
@@ -66,11 +80,16 @@ func (g *BiGormer) DeleteRecord(record gotemporal.TemporalModel, modifyTime null
 		return err
 	}
 	record.Clean()
-	err = g.db.Model(record).Updates(collection).Error
+	for _, e := range collection.ToSlice() {
+		err = g.db.Table(g.tableName).Select("sys_from", "sys_to", "valid_from", "valid_to").Updates(e).Error
+	}
 	if err != nil {
 		return err
 	}
-	err = g.db.Model(record).Create(newRecords).Error
+	for _, e := range newRecords.ToSlice() {
+		// FIXME: Create the whole model instead of only bitemporal.Model
+		err = g.db.Table(g.tableName).Create(e).Error
+	}
 	if err != nil {
 		return err
 	}
@@ -79,7 +98,7 @@ func (g *BiGormer) DeleteRecord(record gotemporal.TemporalModel, modifyTime null
 
 func (g *BiGormer) loadCollection(tid gotemporal.TIDer) (Collection, error) {
 	var list Collection
-	err := g.db.Scopes(
+	err := g.db.Table(g.tableName).Scopes(
 		gotemporal.WithTID(tid),
 	).Find(&list).Error
 	if err != nil {
