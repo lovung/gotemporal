@@ -7,7 +7,7 @@ import (
 )
 
 type creator interface {
-	Create(model interface{}) error
+	Create(model TIDer) error
 }
 
 type updater interface {
@@ -27,7 +27,7 @@ type deleter interface {
 	DeleteRecordWithoutCollection(record TemporalModel, modifyTime null.Time) error
 }
 
-type Temporaler interface {
+type Temporal interface {
 	creator
 	updater
 	getter

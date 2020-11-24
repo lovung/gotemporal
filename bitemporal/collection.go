@@ -99,10 +99,15 @@ func (c *Collection) DeleteByID(id gotemporal.IDer, modifyTime null.Time) (Colle
 		return nil, gotemporal.ErrNotFound
 	}
 
+	if len(list) == 1 {
+		list[0].SysTo = null.TimeFrom(now)
+		return nil, nil
+	}
+
 	index := *pIndex
 	// Delete first item
 	if index == 0 {
-		list[index].SysTo = null.NewTime(now, true)
+		list[index].SysTo = null.TimeFrom(now)
 		newModel := list[1]
 		if !modifyTime.IsZero() && newList[0].ValidFrom.After(modifyTime.Time) {
 			newModel.Clean()
