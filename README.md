@@ -1,4 +1,4 @@
-# Golang package to implement the Temporal Model with ORM
+# Golang Temporal Model with ORM
 
 ## Goals
 - [ ] Managing document versions with timestamps (in the case of bitemporal, two for valid time and two for system time).
